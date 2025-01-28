@@ -268,7 +268,7 @@ def main():
     
     rprint(Panel.fit(
         "[bold cyan]Retrival augmented thinking[/]",
-        title="[bold cyan]RAT 🧠[/]",
+        title="[bold cyan]JARVIS 🧠[/]",
         border_style="cyan"
     ))
     rprint("[yellow]Commands:[/]")

@@ -1,4 +1,4 @@
-from .rat import main
+from .jarvis import main
 
 __all__ = ['main']
 

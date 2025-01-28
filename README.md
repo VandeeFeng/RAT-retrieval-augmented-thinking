@@ -1,18 +1,18 @@
-# 🧠 RAT (Retrieval Augmented Thinking)
+# 🧠 Jarvis (Retrieval Augmented Thinking)
 
 > *Enhancing AI responses through structured reasoning and knowledge retrieval*
 
-RAT is a powerful tool that improves AI responses by leveraging DeepSeek's reasoning capabilities to guide other models through a structured thinking process.
+Jarvis is a powerful tool that improves AI responses by leveraging DeepSeek's reasoning capabilities to guide other models through a structured thinking process.
 
 ## 💡 Origin & Ideation
 
-The idea for RAT emerged from an interesting discovery about DeepSeek-R1 API capabilities. By setting the final response token to 1 while retrieving the thinking process, it became possible to separate the reasoning stage from the final response generation. This insight led to the development of a two-stage approach that combines DeepSeek's exceptional reasoning abilities with various response models.
+The idea for Jarvis emerged from an interesting discovery about DeepSeek-R1 API capabilities. By setting the final response token to 1 while retrieving the thinking process, it became possible to separate the reasoning stage from the final response generation. This insight led to the development of a two-stage approach that combines DeepSeek's exceptional reasoning abilities with various response models.
 
 Link to my original concept in this [Twitter thread](https://x.com/skirano/status/1881922469411643413).
 
 ## How It Works
 
-RAT employs a two-stage approach:
+Jarvis employs a two-stage approach:
 1. **Reasoning Stage** (DeepSeek): Generates detailed reasoning and analysis for each query
 2. **Response Stage** (OpenRouter): Utilizes the reasoning context to provide informed, well-structured answers
 
@@ -40,17 +40,16 @@ Standalone installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Doriandarko/RAT-retrieval-augmented-thinking.git
-   cd RAT-retrieval-augmented-thinking
+   git clone https://github.com/yourusername/jarvis.git
+   cd jarvis
    ```
-
 
 2. Install as a local package:
    ```bash
    pip install -e .
    ```
 
-This will install RAT as a command-line tool, allowing you to run it from anywhere by simply typing `rat`!
+This will install Jarvis as a command-line tool, allowing you to run it from anywhere by simply typing `jarvis`!
 
 ## 📖 Usage
 
@@ -62,9 +61,9 @@ This will install RAT as a command-line tool, allowing you to run it from anywhe
    ANTHROPIC_API_KEY=your_anthropic_api_key_here 
    ```
 
-2. Run RAT from anywhere:
+2. Run Jarvis from anywhere:
    ```bash
-   rat
+   jarvis
    ```
 
 3. Available commands:
@@ -72,8 +71,6 @@ This will install RAT as a command-line tool, allowing you to run it from anywhe
    - Use "model <name>" to switch OpenRouter models
    - Type "reasoning" to show/hide the thinking process
    - Type "quit" to exit
-
-
 
 ## 🚀 Versions
 You can also run each script on its own:
@@ -92,20 +89,19 @@ Requirements for Ollama:
 
 Run it using:
 ```bash
-uv run rat.py
+uv run jarvis.py
 ```
 
-### Claude-Specific Version (rat-claude.py)
+### Claude-Specific Version (jarvis-claude.py)
 A specialized implementation designed for Claude models that leverages Anthropic's message prefilling capabilities. This version makes Claude believe the reasoning process is its own internal thought process, leading to more coherent and contextually aware responses.
 Run it using:
 ```bash
-uv run rat-claude.py
+uv run jarvis-claude.py
 ```
-
 
 ## 🤝 Contributing
 
-Interested in improving RAT?
+Interested in improving Jarvis?
 
 1. Fork the repository
 2. Create your feature branch
@@ -119,8 +115,8 @@ This project is available under the MIT License. See the [LICENSE](LICENSE) file
 If you use this codebase in your projects, please include appropriate credits:
 
 ```plaintext
-This project uses RAT (Retrieval Augmented Thinking) by Skirano
-GitHub: https://github.com/yourusername/rat
+This project uses Jarvis (Retrieval Augmented Thinking)
+GitHub: https://github.com/yourusername/jarvis
 ```
 ---
 
