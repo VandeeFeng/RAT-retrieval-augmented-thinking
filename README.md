@@ -79,7 +79,17 @@ This will install RAT as a command-line tool, allowing you to run it from anywhe
 You can also run each script on its own:
 
 ### Standard Version (rat.py)
-The default implementation using DeepSeek for reasoning and OpenRouter for responses.
+The default implementation using DeepSeek for reasoning and OpenRouter for responses. If DeepSeek API or OpenRouter API keys are not available, it will automatically fall back to using local Ollama models.
+
+Features:
+- Automatic fallback to Ollama models when API keys are not present
+- Support for local Ollama models including Qwen and DeepSeek
+- Seamless integration between cloud and local models
+
+Requirements for Ollama:
+- Ollama installed and running locally
+- Required models pulled (e.g., `ollama pull qwen2.5:14b` or `ollama pull deepseek-r1:14b`)
+
 Run it using:
 ```bash
 uv run rat.py

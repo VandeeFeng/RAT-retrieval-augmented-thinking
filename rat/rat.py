@@ -8,42 +8,77 @@ from prompt_toolkit.styles import Style
 from rich.syntax import Syntax
 import pyperclip
 import time  # Add time import
+import requests
+import json
 
 # Model Constants
 DEEPSEEK_MODEL = "deepseek-reasoner"
 OPENROUTER_MODEL = "openai/gpt-4o-mini"
+OLLAMA_MODEL = "qwen2.5:14b"
+OLLAMA_DEEPSEEK = "deepseek-r1:14b"  
 
 # Load environment variables
 load_dotenv()
 
 class ModelChain:
     def __init__(self):
-        # Initialize DeepSeek client
-        self.deepseek_client = OpenAI(
-            api_key=os.getenv("DEEPSEEK_API_KEY"),
-            base_url="https://api.deepseek.com"
-        )
+        # Initialize clients based on available API keys
+        self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
         
-        # Initialize OpenRouter client
-        self.openrouter_client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=os.getenv("OPENROUTER_API_KEY")
+        self.has_official_deepseek = bool(self.deepseek_api_key)
+        self.has_openrouter = bool(self.openrouter_api_key)
+        
+        if self.has_official_deepseek:
+            self.deepseek_client = OpenAI(
+                api_key=self.deepseek_api_key,
+                base_url="https://api.deepseek.com"
+            )
+        
+        if self.has_openrouter:
+            # Initialize OpenRouter client
+            self.openrouter_client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=self.openrouter_api_key
+            )
+        
+        # Initialize Ollama client with native API path
+        self.ollama_client = OpenAI(
+            base_url="http://localhost:11434/api",
+            api_key="ollama",
         )
         
         self.deepseek_messages = []
-        self.openrouter_messages = []  # New: Add message history for OpenRouter
-        self.current_model = OPENROUTER_MODEL
-        self.show_reasoning = True  # New flag to track reasoning visibility
+        self.openrouter_messages = []
+        self.ollama_messages = []
+        # Default to Ollama model if no OpenRouter API key is available
+        self.current_model = OLLAMA_MODEL if not self.has_openrouter else OPENROUTER_MODEL
+        self.show_reasoning = True
+        self.use_ollama_deepseek = not self.has_official_deepseek  # Default based on API availability
+        self.ollama_base_url = "http://localhost:11434/api"
 
     def set_model(self, model_name):
-        self.current_model = model_name
+        if not self.has_openrouter and not model_name.startswith("ollama:"):
+            rprint("\n[red]Warning: OpenRouter API key not found, falling back to Ollama model[/]")
+            self.current_model = OLLAMA_MODEL
+        else:
+            self.current_model = model_name
+        self.use_ollama_deepseek = model_name.startswith("ollama:deepseek")
 
     def get_model_display_name(self):
         return self.current_model
 
     def get_deepseek_reasoning(self, user_input):
-        start_time = time.time()  # Start timing
-        # Keep track of both user input and previous AI responses
+        start_time = time.time()
+        
+        # Use Ollama if no official API or explicitly specified
+        if not self.has_official_deepseek or self.use_ollama_deepseek:
+            return self.get_ollama_deepseek_reasoning(user_input)
+        else:
+            return self.get_official_deepseek_reasoning(user_input)
+
+    def get_official_deepseek_reasoning(self, user_input):
+        """Use official Deepseek API for reasoning"""
         self.deepseek_messages.append({"role": "user", "content": user_input})
         
         if self.show_reasoning:
@@ -68,7 +103,58 @@ class ModelChain:
             elif chunk.choices[0].delta.content:
                 final_content += chunk.choices[0].delta.content
 
-        elapsed_time = time.time() - start_time  # Calculate elapsed time
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= 60:
+            time_str = f"{elapsed_time/60:.1f} minutes"
+        else:
+            time_str = f"{elapsed_time:.1f} seconds"
+        rprint(f"\n\n[yellow]Thought for {time_str}[/]")
+        
+        if self.show_reasoning:
+            print("\n")
+        return reasoning_content
+
+    def get_ollama_deepseek_reasoning(self, user_input):
+        """Use Ollama version of Deepseek for reasoning"""
+        start_time = time.time()
+        
+        if self.show_reasoning:
+            rprint("\n[blue]Reasoning Process[/]")
+        
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant that thinks step by step."},
+            {"role": "user", "content": f"Please analyze this request and provide your reasoning process:\n{user_input}\n\nThink step by step and explain your thought process."}
+        ]
+        
+        try:
+            response = requests.post(
+                f"{self.ollama_base_url}/chat",
+                json={
+                    "model": OLLAMA_DEEPSEEK.replace("ollama:", ""),
+                    "messages": messages,
+                    "stream": True
+                },
+                stream=True
+            )
+            
+            reasoning_content = ""
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        chunk = json.loads(line.decode())
+                        if "message" in chunk and "content" in chunk["message"]:
+                            content = chunk["message"]["content"]
+                            reasoning_content += content
+                            if self.show_reasoning:
+                                print(content, end="", flush=True)
+                    except json.JSONDecodeError:
+                        continue
+                    
+        except Exception as e:
+            rprint(f"\n[red]Error in streaming response: {str(e)}[/]")
+            return "Error occurred while streaming response"
+
+        elapsed_time = time.time() - start_time
         if elapsed_time >= 60:
             time_str = f"{elapsed_time/60:.1f} minutes"
         else:
@@ -118,6 +204,59 @@ class ModelChain:
         print("\n")
         return full_response
 
+    def get_ollama_response(self, user_input, reasoning):
+        combined_prompt = (
+            f"<question>{user_input}</question>\n\n"
+            f"<thinking>{reasoning}</thinking>\n\n"
+        )
+        
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant that provides clear and concise answers."},
+            {"role": "user", "content": combined_prompt}
+        ]
+        
+        rprint(f"[green]{self.get_model_display_name()}[/]")
+        
+        try:
+            response = requests.post(
+                f"{self.ollama_base_url}/chat",
+                json={
+                    "model": self.current_model.replace("ollama:", ""),
+                    "messages": messages,
+                    "stream": True
+                },
+                stream=True
+            )
+            
+            full_response = ""
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        chunk = json.loads(line.decode())
+                        if "message" in chunk and "content" in chunk["message"]:
+                            content_piece = chunk["message"]["content"]
+                            full_response += content_piece
+                            print(content_piece, end="", flush=True)
+                    except json.JSONDecodeError:
+                        continue
+                    
+        except Exception as e:
+            rprint(f"\n[red]Error in streaming response: {str(e)}[/]")
+            return "Error occurred while streaming response"
+        
+        self.deepseek_messages.append({"role": "assistant", "content": full_response})
+        self.ollama_messages.append({"role": "assistant", "content": full_response})
+        
+        print("\n")
+        return full_response
+
+    def get_response(self, user_input, reasoning):
+        # Use Ollama response if no OpenRouter API or if using Ollama model
+        if not self.has_openrouter or self.current_model.startswith("ollama:"):
+            return self.get_ollama_response(user_input, reasoning)
+        else:
+            return self.get_openrouter_response(user_input, reasoning)
+
 def main():
     chain = ModelChain()
     
@@ -134,9 +273,16 @@ def main():
     ))
     rprint("[yellow]Commands:[/]")
     rprint(" • Type [bold red]'quit'[/] to exit")
-    rprint(" • Type [bold magenta]'model <name>'[/] to change the OpenRouter model")
+    rprint(" • Type [bold magenta]'model <name>'[/] to change the model")
     rprint(" • Type [bold magenta]'reasoning'[/] to toggle reasoning visibility")
-    rprint(" • Type [bold magenta]'clear'[/] to clear chat history\n")
+    rprint(" • Type [bold magenta]'clear'[/] to clear chat history")
+    if not chain.has_openrouter:
+        rprint(" • Using Ollama models (no OpenRouter API key found)")
+    else:
+        rprint(" • For Ollama models, use [bold magenta]'model ollama:<model_name>'[/]")
+    if not chain.has_official_deepseek:
+        rprint(" • Using Ollama Deepseek (no official API key found)")
+    rprint("\n")
     
     while True:
         try:
@@ -149,6 +295,7 @@ def main():
             if user_input.lower() == 'clear':
                 chain.deepseek_messages = []
                 chain.openrouter_messages = []
+                chain.ollama_messages = []
                 rprint("\n[magenta]Chat history cleared![/]\n")
                 continue
                 
@@ -165,7 +312,7 @@ def main():
                 continue
             
             reasoning = chain.get_deepseek_reasoning(user_input)
-            openrouter_response = chain.get_openrouter_response(user_input, reasoning)
+            response = chain.get_response(user_input, reasoning)
             
         except KeyboardInterrupt:
             continue
