@@ -122,8 +122,8 @@ class ModelChain:
             rprint("\n[blue]Reasoning Process[/]")
         
         messages = [
-            {"role": "system", "content": "You are a helpful assistant that thinks step by step."},
-            {"role": "user", "content": f"Please analyze this request and provide your reasoning process:\n{user_input}\n\nThink step by step and explain your thought process."}
+            {"role": "system", "content": "You are a helpful assistant that thinks step by step. Format your response as: <think>your step by step reasoning</think> and stop immediately after closing the think tag."},
+            {"role": "user", "content": f"Analyze this request step by step:\n{user_input}"}
         ]
         
         try:
@@ -138,15 +138,40 @@ class ModelChain:
             )
             
             reasoning_content = ""
+            current_chunk = ""
+            has_started_think = False
+            
             for line in response.iter_lines():
                 if line:
                     try:
                         chunk = json.loads(line.decode())
                         if "message" in chunk and "content" in chunk["message"]:
                             content = chunk["message"]["content"]
-                            reasoning_content += content
-                            if self.show_reasoning:
-                                print(content, end="", flush=True)
+                            current_chunk += content
+                            
+                            # Handle streaming output with tags
+                            if not has_started_think and "<think>" in current_chunk:
+                                has_started_think = True
+                                if self.show_reasoning:
+                                    print("<think>", end="", flush=True)
+                                current_chunk = current_chunk[current_chunk.find("<think>") + 7:]
+                                reasoning_content += "<think>"  # Add opening tag to final content
+                            
+                            if has_started_think:
+                                if "</think>" in current_chunk:
+                                    end_idx = current_chunk.find("</think>")
+                                    if self.show_reasoning:
+                                        print(current_chunk[:end_idx], end="", flush=True)
+                                        print("</think>", end="", flush=True)
+                                    reasoning_content += current_chunk[:end_idx] + "</think>"  # Add content and closing tag
+                                    response.close()  # Close the stream
+                                    break  # Exit the loop after finding </think>
+                                else:
+                                    if self.show_reasoning:
+                                        print(current_chunk, end="", flush=True)
+                                    reasoning_content += current_chunk
+                                    current_chunk = ""
+                                
                     except json.JSONDecodeError:
                         continue
                     
@@ -163,12 +188,12 @@ class ModelChain:
         
         if self.show_reasoning:
             print("\n")
-        return reasoning_content
+        return reasoning_content  # Now includes <think> tags
 
     def get_openrouter_response(self, user_input, reasoning):
         combined_prompt = (
             f"<question>{user_input}</question>\n\n"
-            f"<thinking>{reasoning}</thinking>\n\n"
+            f"{reasoning}\n\n"
         )
         
         self.openrouter_messages.append({"role": "user", "content": combined_prompt})
@@ -207,7 +232,7 @@ class ModelChain:
     def get_ollama_response(self, user_input, reasoning):
         combined_prompt = (
             f"<question>{user_input}</question>\n\n"
-            f"<thinking>{reasoning}</thinking>\n\n"
+            f"{reasoning}\n\n"
         )
         
         messages = [
